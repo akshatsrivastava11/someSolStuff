@@ -18,7 +18,7 @@ function Sendsol() {
                 }
             )
         )
-      await   wallet.sendTransaction(txs,connection.connection)
+      await   wallet.sendTransaction(txs,cornnection.connection)
       alert("Send sol")
     }
   return (
@@ -32,4 +32,4 @@ function Sendsol() {
   )
 }
 
-export default Sendsol
+export default Sendsolr
