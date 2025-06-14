@@ -1,94 +1,184 @@
-
-
-import { createInitializeInstruction, createInitializeMetadataPointerInstruction, createInitializeMint2Instruction, createMint, createMintToCheckedInstruction, ExtensionType, getMinimumBalanceForRentExemptAccount, getMinimumBalanceForRentExemptMint, getMint, getMintLen, LENGTH_SIZE, MetadataPointerInstruction, MINT_SIZE, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID, tokenMetadataInitialize, transfer, TYPE_SIZE } from "@solana/spl-token"
+import { 
+    ASSOCIATED_TOKEN_PROGRAM_ID,
+    createAssociatedTokenAccount,
+    createAssociatedTokenAccountInstruction,
+    createInitializeInstruction, 
+    createInitializeMetadataPointerInstruction, 
+    createInitializeMint2Instruction, 
+    createInitializeMintInstruction, 
+    createMintToInstruction, 
+    ExtensionType, 
+    getAssociatedTokenAddress, 
+    getAssociatedTokenAddressSync, 
+    getMintLen, 
+    LENGTH_SIZE, 
+    TOKEN_2022_PROGRAM_ID, 
+    TYPE_SIZE 
+} from "@solana/spl-token"
 import { useConnection, useWallet } from "@solana/wallet-adapter-react"
-import { Keypair, SystemProgram, Transaction ,} from "@solana/web3.js"
+import { Keypair, SystemProgram, Transaction } from "@solana/web3.js"
 import { useState } from "react"
-import {pack} from '@solana/spl-token-metadata'
+import { pack } from '@solana/spl-token-metadata'
+
 function CreateMint() {
-    const [formData, setformData] = useState({
-        name:"",
-        symbol:"",
-        uri:""
+    const [formData, setFormData] = useState({
+        name: "",
+        symbol: "",
+        uri: ""
     })
-    const {sendTransaction,publicKey}=useWallet()
-    const {connection}=useConnection()
-    const handleMintCreation=async (e:any)=>{
-        
+    
+    const { sendTransaction, publicKey } = useWallet()
+    const { connection } = useConnection()
+    
+    const handleMintCreation = async (e: any) => {
         e.preventDefault()
-        const name=formData.name
-        const symbol=formData.symbol
-        const uri=formData.uri
-        const MintAccKey=Keypair.generate()
-        const metaData={
-            mint: MintAccKey.publicKey,
-            name: 'ASkI',
-            symbol: 'Ask    ',
-            uri: 'https://cdn.100xdevs.com/metadata.json',
-            additionalMetadata: [],
+        
+        if (!publicKey) {
+            alert("Please connect your wallet first")
+            return
         }
-        // console.log("the wallet's public key is",publicKey?.toBase58)
-        // const pubkey=Uint8Array.from("AkZeYmwGNGUm1YVFsNabZSrobFjZqfmu4tRMsAYMhtopLRoMaAjzrHSgTM93CTWBhBNPiNYbGVckSqrVBiaDqyf")
-        // console.log(pubkey)
-        console.log("this func triggeredd")
-        const lamports_for_metadata=getMintLen([ExtensionType.MetadataPointer])
-        const metadataLen = TYPE_SIZE + LENGTH_SIZE + pack(metaData).length;
-
-        const lamports=await connection.getMinimumBalanceForRentExemption(metadataLen+lamports_for_metadata)
-        console.log(MintAccKey)
-        if(publicKey==null) return
-
-        const transaction=new Transaction().add(
-            SystemProgram.createAccount({
-                fromPubkey:publicKey,
-                lamports:lamports,
-                newAccountPubkey:MintAccKey.publicKey,
-                space:lamports_for_metadata,
-                programId:TOKEN_2022_PROGRAM_ID
-            
-            }),
-            createInitializeMetadataPointerInstruction(MintAccKey.publicKey,publicKey,MintAccKey.publicKey,TOKEN_2022_PROGRAM_ID),
-            createInitializeMint2Instruction(MintAccKey.publicKey,8,publicKey,null,TOKEN_2022_PROGRAM_ID),
-            createInitializeInstruction({
-                  programId: TOKEN_2022_PROGRAM_ID,
-    metadata: MintAccKey.publicKey,
-    updateAuthority:publicKey ,
-    mint: MintAccKey.publicKey,
-    mintAuthority:publicKey,
-    name: metaData.name,
-    symbol: metaData.symbol,
-    uri: metaData.uri
-            })
-        )
-        // tokenMetadataInitialize(connection,publicKey,MintAccKey.publicKey,)
-        const recentBLockHAsh=(await connection.getLatestBlockhash()).blockhash
-        transaction.feePayer=publicKey
-        transaction.recentBlockhash=recentBLockHAsh
-        transaction.partialSign(MintAccKey)
         
-        console.log(MintAccKey.publicKey.toBase58())
-        // wallet.signTransaction(transaction)
-            console.log(transaction)
-            await sendTransaction(transaction,connection)
-            console.log(transaction)
-            // const txid=await connection.sendRawTransaction(transaction.serialize())
-            // const confirm=await connection.confirmTransaction(txid)
-            // console.log(confirm)
-            alert("Account generated successfully")
+      
+        try {
+            const mintKeypair = Keypair.generate()
             
-        
-        console.log("control reached here")
-        const mintinfo=await getMint(connection,MintAccKey.publicKey)
-        console.log("mintoff is",mintinfo)
+            // Use form data instead of hardcoded values
+            const metadata = {
+                mint: mintKeypair.publicKey,
+                name: "akshat",
+                symbol: "ASK",
+                uri: "https://metadata.com",
+                additionalMetadata: [],
+            }
+            
+            // Calculate space needed for the mint with metadata pointer extension
+            const mintLen = getMintLen([ExtensionType.MetadataPointer])
+            const metadataLen = TYPE_SIZE + LENGTH_SIZE + pack(metadata).length
+            
+            // Total space needed
+            const totalSpace = mintLen + metadataLen
+            
+            // Get minimum lamports for rent exemption
+            const lamports = await connection.getMinimumBalanceForRentExemption(totalSpace)
+            
+            console.log("Creating mint with metadata:", metadata)
+            console.log("Mint address:", mintKeypair.publicKey.toBase58())
+            
+            const transaction = new Transaction().add(
+                // Create the mint account
+                SystemProgram.createAccount({
+                    fromPubkey: publicKey,
+                    lamports: lamports,
+                    newAccountPubkey: mintKeypair.publicKey,
+                    space: mintLen, // Use total space here
+                    programId: TOKEN_2022_PROGRAM_ID
+                }),
+                
+                // Initialize metadata pointer
+                createInitializeMetadataPointerInstruction(
+                    mintKeypair.publicKey,
+                    publicKey,
+                    mintKeypair.publicKey,
+                    TOKEN_2022_PROGRAM_ID
+                ),
+                
+                // Initialize mint
+                createInitializeMintInstruction(mintKeypair.publicKey,8,publicKey,null,TOKEN_2022_PROGRAM_ID)
+                ,
+                // Initialize metadata
+                createInitializeInstruction({
+                    programId: TOKEN_2022_PROGRAM_ID,
+                    metadata: mintKeypair.publicKey,
+                    updateAuthority: publicKey,
+                    mint: mintKeypair.publicKey,
+                    mintAuthority: publicKey,
+                    name: metadata.name,
+                    symbol: metadata.symbol,
+                    uri: metadata.uri
+                })
+            )
+            
+            // Set transaction properties
+            const { blockhash } = await connection.getLatestBlockhash()
+            transaction.feePayer = publicKey
+            transaction.recentBlockhash = blockhash
+            
+            // Sign with mint keypair
+            transaction.partialSign(mintKeypair)
+            
+            console.log("Sending transaction...")
+            const signature = await sendTransaction(transaction, connection)
+            
+            console.log("Transaction sent:", signature)
+            console.log("Mint created at:", mintKeypair.publicKey.toBase58())
+            
+            alert(`Token created successfully! Mint address: ${mintKeypair.publicKey.toBase58()}`)
+            
+            // Reset form
+            setFormData({ name: "", symbol: "", uri: "" })
+
+            // now creating  an ata
+            const associatedTokenAddress=getAssociatedTokenAddressSync(mintKeypair.publicKey,publicKey,false,TOKEN_2022_PROGRAM_ID,ASSOCIATED_TOKEN_PROGRAM_ID)
+            console.log("the ata is  ",associatedTokenAddress.toBase58())
+            const transaction2=new Transaction().add(
+                createAssociatedTokenAccountInstruction(publicKey,
+                    associatedTokenAddress,
+                    publicKey,
+                    mintKeypair.publicKey,
+                    TOKEN_2022_PROGRAM_ID
+                )
+            )
+            await sendTransaction(transaction2,connection)
+            const transaction3=new Transaction().add(
+                createMintToInstruction(mintKeypair.publicKey,associatedTokenAddress,publicKey,100000000,[],TOKEN_2022_PROGRAM_ID)
+            )
+            await sendTransaction(transaction3,connection)
+            console.log("minted ")
+            
+        } catch (error) {
+            console.error("Error creating mint:", error)
+            alert(`Error creating mint: ${error instanceof Error ? error.message : 'Unknown error'}`)
+        }
     }
-  return (
-    <form onSubmit={handleMintCreation}>
-        <input value={formData.name} onChange={(e) => setformData(prev => ({ ...prev, name: e.target.value }))} />
-        <input value={formData.symbol} onChange={(e) => setformData(prev => ({ ...prev, symbol: e.target.value }))}/>
-        <input value={formData.uri} onChange={(e) => setformData(prev => ({ ...prev, uri: e.target.value }))}/>
-        <button type="submit">Submit</button>
-</form>
-  )
-} 
+    
+    return (
+        <div>
+            <h2>Create SPL Token with Metadata</h2>
+            <form onSubmit={handleMintCreation}>
+                <div>
+                    <label>Token Name:</label>
+                    <input 
+                        type="text"
+                        placeholder="Enter token name"
+                        value={formData.name} 
+                        onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))} 
+                        
+                    />
+                </div>
+                <div>
+                    <label>Token Symbol:</label>
+                    <input 
+                        type="text"
+                        placeholder="Enter token symbol"
+                        value={formData.symbol} 
+                        onChange={(e) => setFormData(prev => ({ ...prev, symbol: e.target.value }))}
+                        
+                    />
+                </div>
+                <div>
+                    <label>Metadata URI:</label>
+                    <input 
+                        type="url"
+                        placeholder="Enter metadata URI"
+                        value={formData.uri} 
+                        onChange={(e) => setFormData(prev => ({ ...prev, uri: e.target.value }))}
+                        
+                    />
+                </div>
+                <button type="submit">Create Token</button>
+            </form>
+        </div>
+    )
+}
 
 export default CreateMint
