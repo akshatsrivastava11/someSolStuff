@@ -24,7 +24,7 @@ async function SwapSol(){
     console.log(`https://solscan.io/tx/${txid}`);
     // console.log(txs.data.swapTransaction)}-
 }
-catch(e){
+catch(e){ 
     console.log(e)
 }
 }
